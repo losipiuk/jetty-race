@@ -244,3 +244,103 @@ Caused by: java.lang.NullPointerException: Cannot invoke "org.eclipse.jetty.http
 ```
 
 
+### POST with ReadListener which is sometimes set after request is already failed
+
+This test simulate the case when we need to wait for resources needed for processing request 
+via ReadListener. In such case it is possible that ReadListener setting races with request timeout
+and if ReadListener is set after request is actually already failed we get new set of errors.
+
+How to test:
+
+```shell
+ab -r -n 10000 -c 100 -T "application/octet-stream" -p test.data http://127.0.0.1:8080/api/test/readlistenerlate
+```
+
+Exceptions:
+```
+2024-04-22T12:19:34.937+0200	WARN	jersey-background-task-scheduler-0	org.glassfish.jersey.server.ServerRuntime$Responder	Attempt to release request processing resources has failed for a request.
+java.lang.IllegalStateException: s=IDLE rs=COMPLETED os=COMPLETED is=READY awp=false se=false i=false al=0
+	at org.eclipse.jetty.ee10.servlet.ServletChannelState.unhandle(ServletChannelState.java:417)
+	at org.eclipse.jetty.ee10.servlet.ServletChannel.handle(ServletChannel.java:587)
+	at org.eclipse.jetty.server.handler.ContextHandler$ScopedContext.run(ContextHandler.java:1298)
+	at org.eclipse.jetty.server.handler.ContextHandler$ScopedContext.run(ContextHandler.java:1285)
+	at org.eclipse.jetty.ee10.servlet.ServletChannelState.runInContext(ServletChannelState.java:1257)
+	at org.eclipse.jetty.ee10.servlet.ServletChannelState.complete(ServletChannelState.java:783)
+	at org.eclipse.jetty.ee10.servlet.AsyncContextState.complete(AsyncContextState.java:61)
+	at org.glassfish.jersey.servlet.async.AsyncContextDelegateProviderImpl$ExtensionImpl.complete(AsyncContextDelegateProviderImpl.java:102)
+	at org.glassfish.jersey.servlet.internal.ResponseWriter.commit(ResponseWriter.java:173)
+	at org.glassfish.jersey.server.ContainerResponse.close(ContainerResponse.java:404)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:184)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:151)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:174)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at org.glassfish.jersey.server.ServerRuntime$Responder.release(ServerRuntime.java:775)
+	at org.glassfish.jersey.server.ServerRuntime$Responder.process(ServerRuntime.java:469)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder$4.run(ServerRuntime.java:928)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:248)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:244)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:292)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:274)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:244)
+	at org.glassfish.jersey.process.internal.RequestScope.runInScope(RequestScope.java:266)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder.resume(ServerRuntime.java:950)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder.resume(ServerRuntime.java:923)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder.onTimeout(ServerRuntime.java:846)
+	at org.glassfish.jersey.server.internal.JerseyRequestTimeoutHandler$1.run(JerseyRequestTimeoutHandler.java:121)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+```
+
+```
+2024-04-22T12:19:35.898+0200	WARN	jersey-background-task-scheduler-0	org.eclipse.jetty.ee10.servlet.ServletChannel	/api/test/readlistenerlate
+java.lang.IllegalStateException: demand pending
+	at org.eclipse.jetty.server.internal.HttpChannelState$ChannelCallback.succeeded(HttpChannelState.java:1458)
+	at org.eclipse.jetty.ee10.servlet.ServletChannel.onCompleted(ServletChannel.java:760)
+	at org.eclipse.jetty.ee10.servlet.ServletChannel.handle(ServletChannel.java:421)
+	at org.eclipse.jetty.server.handler.ContextHandler$ScopedContext.run(ContextHandler.java:1298)
+	at org.eclipse.jetty.server.handler.ContextHandler$ScopedContext.run(ContextHandler.java:1285)
+	at org.eclipse.jetty.ee10.servlet.ServletChannelState.runInContext(ServletChannelState.java:1257)
+	at org.eclipse.jetty.ee10.servlet.ServletChannelState.complete(ServletChannelState.java:783)
+	at org.eclipse.jetty.ee10.servlet.AsyncContextState.complete(AsyncContextState.java:61)
+	at org.glassfish.jersey.servlet.async.AsyncContextDelegateProviderImpl$ExtensionImpl.complete(AsyncContextDelegateProviderImpl.java:102)
+	at org.glassfish.jersey.servlet.internal.ResponseWriter.commit(ResponseWriter.java:173)
+	at org.glassfish.jersey.server.ContainerResponse.close(ContainerResponse.java:404)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:184)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:151)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:174)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at org.glassfish.jersey.server.ServerRuntime$Responder.release(ServerRuntime.java:775)
+	at org.glassfish.jersey.server.ServerRuntime$Responder.process(ServerRuntime.java:469)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder$4.run(ServerRuntime.java:928)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:248)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:244)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:292)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:274)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:244)
+	at org.glassfish.jersey.process.internal.RequestScope.runInScope(RequestScope.java:266)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder.resume(ServerRuntime.java:950)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder.resume(ServerRuntime.java:923)
+	at org.glassfish.jersey.server.ServerRuntime$AsyncResponder.onTimeout(ServerRuntime.java:846)
+	at org.glassfish.jersey.server.internal.JerseyRequestTimeoutHandler$1.run(JerseyRequestTimeoutHandler.java:121)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+```

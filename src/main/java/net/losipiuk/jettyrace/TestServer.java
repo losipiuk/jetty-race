@@ -21,7 +21,9 @@ import io.airlift.event.client.EventModule;
 import io.airlift.http.server.HttpServerModule;
 import io.airlift.jaxrs.JaxrsModule;
 import io.airlift.json.JsonModule;
+import io.airlift.log.Level;
 import io.airlift.log.Logger;
+import io.airlift.log.Logging;
 import io.airlift.node.testing.TestingNodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
 import io.airlift.tracing.TracingModule;
@@ -36,6 +38,10 @@ public final class TestServer
 
     public static void main(String[] args)
     {
+        // Configure logging levels here:
+        Logging logging = Logging.initialize();
+        logging.setLevel("org.eclipse.jetty", Level.WARN);
+
         Bootstrap app = new Bootstrap(
                 new TestingNodeModule(),
                 new HttpServerModule(),
@@ -53,7 +59,7 @@ public final class TestServer
                 });
 
         try {
-            app.initialize();
+            app.doNotInitializeLogging().initialize();
             log.info("======== SERVER STARTED ========");
         }
         catch (ApplicationConfigurationException e) {
